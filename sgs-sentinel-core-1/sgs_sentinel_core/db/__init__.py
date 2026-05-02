@@ -1,0 +1,1 @@
+# This file initializes the `db` package, which may handle database connections and interactions.
