@@ -96,7 +96,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
 def require_role(*roles: UserRole):
     """Dependency factory — enforces that the current user holds one of the given roles.
 
-    Usage:
+    Returns a callable suitable for use with ``Depends``.
+
+    Usage::
+
+        # As a route parameter dependency:
+        current_user: User = Depends(require_role(UserRole.ADMIN))
+
+        # As a route-level dependency:
         @router.get("/admin-only", dependencies=[Depends(require_role(UserRole.ADMIN))])
     """
     async def _check(user: User = Depends(get_current_user)) -> User:
@@ -106,7 +113,7 @@ def require_role(*roles: UserRole):
                 detail=f"Required role(s): {[r.value for r in roles]}",
             )
         return user
-    return Depends(_check)
+    return _check
 
 
 # ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/v1/tenants", tags=["tenants"])
 @router.get("", response_model=list[TenantResponse])
 async def list_tenants(
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role(UserRole.ADMIN),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ) -> list[TenantResponse]:
     """List all tenants. Admin only."""
     result = await db.execute(select(Tenant).order_by(Tenant.created_at))
@@ -28,7 +28,7 @@ async def list_tenants(
 async def create_tenant(
     payload: TenantCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role(UserRole.ADMIN),
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
 ) -> TenantResponse:
     """Create a new tenant. Admin only."""
     tenant = Tenant(name=payload.name)

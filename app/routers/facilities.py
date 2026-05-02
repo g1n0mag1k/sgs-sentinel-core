@@ -32,7 +32,7 @@ async def list_facilities(
 async def create_facility(
     payload: FacilityCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role(UserRole.ADMIN, UserRole.MANAGER),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
 ) -> FacilityResponse:
     """Create a new facility under the current user's tenant."""
     facility = Facility(
@@ -69,7 +69,7 @@ async def get_facility(
 async def delete_facility(
     facility_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = require_role(UserRole.ADMIN, UserRole.MANAGER),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
 ) -> None:
     """Delete a facility by ID, scoped to the current user's tenant."""
     result = await db.execute(
