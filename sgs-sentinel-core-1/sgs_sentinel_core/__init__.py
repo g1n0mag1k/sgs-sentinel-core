@@ -1,1 +1,0 @@
-# This file initializes the sgs_sentinel_core package.
