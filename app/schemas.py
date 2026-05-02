@@ -75,6 +75,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: UserRole
+    tenant_id: UUID
 
 
 class UserResponse(BaseModel):
