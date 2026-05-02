@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth import authenticate_user, create_access_token
+from app.database import get_db
+from app.schemas import Token
+
+router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+@router.post("/token", response_model=Token)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db),
+) -> Token:
+    """Exchange username/password credentials for a JWT access token."""
+    user = await authenticate_user(db, form_data.username, form_data.password)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(
+        subject=user.email,
+        tenant_id=user.tenant_id,
+        role=user.role,
+    )
+    return Token(access_token=access_token)
