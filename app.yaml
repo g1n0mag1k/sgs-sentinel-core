@@ -8,7 +8,7 @@ services:
     environment_slug: python
     source_dir: /
     http_port: 8000
-    run_command: export PYTHONPATH=$PYTHONPATH:. && gunicorn app.main:app --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread
+    run_command: export PYTHONPATH=$PYTHONPATH:. && gunicorn app.main:app --bind 0.0.0.0:8000 --workers 1 --threads 1 --worker-class gthread
     instance_count: 1
     instance_size_slug: basic-xxs
     envs:
