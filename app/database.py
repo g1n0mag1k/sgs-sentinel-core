@@ -22,12 +22,12 @@ settings = Settings()
 
 # Use environment DATABASE_URL or fall back to SQLite for local development
 try:
-    database_url = settings.DATABASE_URL or os.getenv("DATABASE_URL", "sqlite:///./test.db")
+    database_url = settings.DATABASE_URL or os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
     engine = create_async_engine(database_url, echo=False, pool_pre_ping=True)
 except Exception as e:
     # Fallback: always use SQLite if connection fails
     print(f"Database connection warning: {e}. Using SQLite fallback.")
-    engine = create_async_engine("sqlite:///./test.db", echo=False, pool_pre_ping=True)
+    engine = create_async_engine("sqlite+aiosqlite:///./test.db", echo=False, pool_pre_ping=True)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
