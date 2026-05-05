@@ -11,6 +11,11 @@ services:
     run_command: export PYTHONPATH=$PYTHONPATH:. && gunicorn app.main:app --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread
     instance_count: 1
     instance_size_slug: basic-xxs
+    envs:
+      - key: SECRET_KEY
+        value: ${SECRET_KEY}
+      - key: DATABASE_URL
+        value: ${DATABASE_URL}
     health_check:
       http_path: /api/health
       initial_delay_seconds: 30
@@ -34,3 +39,4 @@ ingress:
 alerts:
   - rule: DEPLOYMENT_FAILED
   - rule: DOMAIN_FAILED
+
