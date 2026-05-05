@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import authenticate_user, create_access_token
+from app.auth import authenticate_user, create_access_token, require_role
 from app.database import get_db
-from app.schemas import Token
+from app.models import User, UserRole
+from app.schemas import SessionRequest, Token
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -28,5 +31,21 @@ async def login(
         subject=user.email,
         tenant_id=user.tenant_id,
         role=user.role,
+    )
+    return Token(access_token=access_token)
+
+
+@router.post("/session", response_model=Token)
+async def create_session(
+    payload: SessionRequest,
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+) -> Token:
+    """Create a short-lived auditor session token for a pharmacy contact."""
+    access_token = create_access_token(
+        subject=payload.contact_email,
+        tenant_id=current_user.tenant_id,
+        role=UserRole.AUDITOR,
+        expires_delta=timedelta(hours=24),
+        additional_claims={"pharmacy_name": payload.pharmacy_name},
     )
     return Token(access_token=access_token)

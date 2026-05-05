@@ -12,8 +12,8 @@ from app.models import AuditLog, User
 from app.routers import auth as auth_router
 from app.routers import facilities as facilities_router
 from app.routers import tenants as tenants_router
-from app.schemas import ScoreRequest, ScoreResponse
-from app.services.scoring import evaluate_dscsa_risk
+from app.schemas import ScoreRequest, ScoreResponse, DualScoreRequest, DualScoreResponse
+from app.services.scoring import evaluate_dscsa_risk, score_attestation, calculate_dual_score
 
 app = FastAPI(title="SGS-Sentinel Core", version="0.1.0")
 
@@ -37,7 +37,8 @@ async def score_assessment(
 ) -> ScoreResponse:
     """Score an EPCIS payload and write an immutable chained audit record."""
     try:
-        score = await evaluate_dscsa_risk(request.model_dump())
+        # Evaluate technical DSCSA risk score
+        score = await evaluate_dscsa_risk(request.payload, db, current_user.tenant_id)
 
         # Compute prev_hash from most recent audit log for this tenant
         result = await db.execute(
@@ -55,6 +56,7 @@ async def score_assessment(
             else None
         )
 
+        # Write full response to audit log payload (JSONB column)
         db.add(
             AuditLog(
                 tenant_id=current_user.tenant_id,
@@ -73,3 +75,68 @@ async def score_assessment(
     except Exception as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Assessment scoring failed") from exc
+
+
+@app.post("/api/v1/assessment/dual-score", response_model=DualScoreResponse)
+async def dual_score_assessment(
+    request: DualScoreRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DualScoreResponse:
+    """Score EPCIS payload and self-attestation, return combined DualScoreResponse.
+    
+    The response includes both technical flags and attestation gaps, saved to audit trail.
+    """
+    try:
+        # Evaluate technical DSCSA risk score
+        technical_score = await evaluate_dscsa_risk(
+            request.epcis_payload, db, current_user.tenant_id
+        )
+        
+        # Score the attestation responses
+        attestation_score, attestation_grade, gaps = score_attestation(request.attestation)
+        
+        # Calculate combined dual score
+        response = calculate_dual_score(
+            technical_score=technical_score,
+            attestation_score=attestation_score,
+            attestation_grade=attestation_grade,
+            flags=technical_score.flags,
+            gaps=gaps,
+        )
+
+        # Compute prev_hash from most recent audit log for this tenant
+        result = await db.execute(
+            select(AuditLog)
+            .where(AuditLog.tenant_id == current_user.tenant_id)
+            .order_by(AuditLog.timestamp.desc())
+            .limit(1)
+        )
+        last_log = result.scalar_one_or_none()
+        prev_hash = (
+            hashlib.sha256(
+                f"{last_log.id}{last_log.timestamp}{last_log.action}".encode()
+            ).hexdigest()
+            if last_log
+            else None
+        )
+
+        # Write full DualScoreResponse to audit log payload (JSONB column)
+        db.add(
+            AuditLog(
+                tenant_id=current_user.tenant_id,
+                user_id=current_user.id,
+                action="assessment.dual_score",
+                resource="dscsa_assessment",
+                prev_hash=prev_hash,
+                payload={
+                    "request": request.model_dump(),
+                    "response": response.model_dump(),  # Full response with flags and gaps
+                },
+            )
+        )
+        await db.commit()
+        return response
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Dual score assessment failed") from exc

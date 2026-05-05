@@ -3,6 +3,21 @@ from pydantic import BaseModel, Field
 
 AttestationAnswer = Literal["yes", "partial", "no"]
 
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class ScoreRequest(BaseModel):
+    """Request for DSCSA risk scoring."""
+    payload: dict[str, Any]
+
+class ScoreResponse(BaseModel):
+    """Response with technical score and flags."""
+    score: int = Field(ge=0, le=100)
+    risk_tier: Literal["LOW", "MEDIUM", "HIGH"]
+    flags: list[str] = Field(default_factory=list)
+
 class M1M6Attestation(BaseModel):
     answers: dict[str, AttestationAnswer]
     # e.g. {"M1-Q1": "yes", "M2-Q3": "partial", ...}
@@ -12,6 +27,11 @@ class DualScoreRequest(BaseModel):
     epcis_payload: dict[str, Any]
     attestation: M1M6Attestation
     facility_name: str
+
+
+class SessionRequest(BaseModel):
+    pharmacy_name: str
+    contact_email: str
 
 class DualScoreResponse(BaseModel):
     deterministic_technical_score: int = Field(ge=0, le=100)

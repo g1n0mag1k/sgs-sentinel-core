@@ -43,6 +43,7 @@ def create_access_token(
     tenant_id: UUID,
     role: UserRole,
     expires_delta: timedelta | None = None,
+    additional_claims: dict[str, Any] | None = None,
 ) -> str:
     """Mint a signed JWT containing user identity and tenant context."""
     expire = datetime.now(timezone.utc) + (
@@ -55,6 +56,8 @@ def create_access_token(
         "role": role.value,
         "exp": expire,
     }
+    if additional_claims:
+        payload.update(additional_claims)
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 

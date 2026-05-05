@@ -1,24 +1,98 @@
+"""Scoring and assessment functions for DSCSA compliance."""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import Facility
+from app.schemas import ScoreResponse, DualScoreResponse, M1M6Attestation, AttestationAnswer
+
+
+def _extract_gln(payload: dict[str, Any]) -> str:
+    """Extract GLN (Global Location Number) from EPCIS payload."""
+    # Try common EPCIS payload locations for GLN
+    if "bizLocation" in payload:
+        biz_loc = payload["bizLocation"]
+        if isinstance(biz_loc, dict) and "id" in biz_loc:
+            gln = biz_loc["id"]
+            # Extract numeric GLN from URN (e.g., "urn:epc:id:sgln:0614141.00000.0")
+            if "sgln:" in gln:
+                parts = gln.split("sgln:")[-1].split(".")
+                if len(parts) >= 2:
+                    return parts[0] + parts[1]
+            return gln
+    
+    if "sensorElementList" in payload:
+        sensors = payload.get("sensorElementList", [])
+        if sensors and isinstance(sensors, list):
+            for sensor in sensors:
+                if "sensorElement" in sensor:
+                    for elem in sensor["sensorElement"]:
+                        if "id" in elem:
+                            return elem["id"]
+    
+    return ""
+
+
+def _extract_event_times(payload: dict[str, Any]) -> list[int]:
+    """Extract and convert event timestamps to sortable format."""
+    times = []
+    
+    # Check for eventTime in payload
+    if "eventTime" in payload:
+        try:
+            # Convert ISO timestamp to integer for comparison
+            event_time = payload["eventTime"]
+            if isinstance(event_time, str):
+                # Simple conversion: count digits to create comparable int
+                times.append(int(event_time.replace("-", "").replace(":", "").replace("T", "").replace("Z", "")[:12]))
+        except (ValueError, TypeError):
+            pass
+    
+    # Check for event list
+    if "eventList" in payload:
+        for event in payload["eventList"]:
+            if "eventTime" in event:
+                try:
+                    event_time = event["eventTime"]
+                    if isinstance(event_time, str):
+                        times.append(int(event_time.replace("-", "").replace(":", "").replace("T", "").replace("Z", "")[:12]))
+                except (ValueError, TypeError):
+                    pass
+    
+    return times
+
+
 def _validate_gln_check_digit(gln: str) -> bool:
     """GS1 standard: weighted sum mod 10 == 0."""
-    if not gln.isdigit() or len(gln) != 13:
+    if not gln or not gln.isdigit() or len(gln) != 13:
         return False
     weights = [3 if i % 2 else 1 for i in range(12)]
     total = sum(int(d) * w for d, w in zip(gln[:12], weights))
     check = (10 - (total % 10)) % 10
     return check == int(gln[12])
 
+
 async def evaluate_dscsa_risk(
     payload: dict[str, Any],
     db: AsyncSession,
     tenant_id: uuid.UUID,
 ) -> ScoreResponse:
+    """Evaluate DSCSA compliance risk from EPCIS payload.
+    
+    Returns technical score (0-100), risk tier, and flags explaining the assessment.
+    """
     score = 0
     flags: list[str] = []
 
     gln = _extract_gln(payload)
 
     # Check digit validity (20 pts)
-    if _validate_gln_check_digit(gln):
+    if gln and _validate_gln_check_digit(gln):
         score += 20
     else:
         flags.append("GLN_CHECK_DIGIT_FAIL")
@@ -44,15 +118,105 @@ async def evaluate_dscsa_risk(
             score += 10
 
     # EPCIS 2.0 context header present (25 pts)
-    ctx = payload.get("@context","")
+    ctx = payload.get("@context", "")
     if "epcis/2.0" in str(ctx).lower():
         score += 25
-        flags.append("EPCIS_20_CONFIRMED") if not flags else None
     else:
         flags.append("EPCIS_VERSION_MISSING_OR_1X")
 
-    if score >= 80: risk_tier = "LOW"
-    elif score >= 50: risk_tier = "MEDIUM"
-    else: risk_tier = "HIGH"
+    if score >= 80:
+        risk_tier = "LOW"
+    elif score >= 50:
+        risk_tier = "MEDIUM"
+    else:
+        risk_tier = "HIGH"
 
     return ScoreResponse(score=score, risk_tier=risk_tier, flags=flags)
+
+
+def score_attestation(attestation: M1M6Attestation) -> tuple[float, str, list[str]]:
+    """Score self-attestation responses.
+    
+    Returns:
+        - self_attested_score: float 0.0-1.0
+        - self_attested_grade: letter grade A-F
+        - gaps: list of question IDs where answer was not 'yes'
+    """
+    answers = attestation.answers
+    if not answers:
+        return 0.0, "F", list(answers.keys())
+    
+    gaps: list[str] = []
+    yes_count = 0
+    
+    for question_id, answer in answers.items():
+        if answer == "yes":
+            yes_count += 1
+        else:
+            gaps.append(question_id)
+    
+    # Calculate score as proportion of "yes" answers
+    score = yes_count / len(answers)
+    
+    # Determine grade
+    if score >= 0.9:
+        grade = "A"
+    elif score >= 0.8:
+        grade = "B"
+    elif score >= 0.7:
+        grade = "C"
+    elif score >= 0.6:
+        grade = "D"
+    else:
+        grade = "F"
+    
+    return score, grade, gaps
+
+
+def calculate_dual_score(
+    technical_score: ScoreResponse,
+    attestation_score: float,
+    attestation_grade: str,
+    flags: list[str],
+    gaps: list[str],
+) -> DualScoreResponse:
+    """Combine technical and attestation scores into final response.
+    
+    Args:
+        technical_score: ScoreResponse from EPCIS evaluation
+        attestation_score: 0.0-1.0 float from attestation
+        attestation_grade: Letter grade from attestation
+        flags: Flag list from technical evaluation
+        gaps: Gap list from attestation evaluation
+    
+    Returns:
+        DualScoreResponse with combined scores, verdict, and audit info
+    """
+    # Calculate score delta (technical vs attested, scaled to 0-100)
+    attested_scaled = int(attestation_score * 100)
+    score_delta = technical_score.score - attested_scaled
+    
+    # Determine verdict based on alignment and grades
+    if technical_score.risk_tier == "CRITICAL" or attestation_grade == "F":
+        attestation_verdict = "CRITICAL_FAILURE"
+    elif technical_score.risk_tier == "HIGH" or gaps:
+        attestation_verdict = "NON_COMPLIANT"
+    else:
+        attestation_verdict = "COMPLIANT"
+    
+    # Determine overall risk tier (worse of the two)
+    if technical_score.risk_tier == "HIGH" or attestation_grade in ["F", "D"]:
+        overall_risk = "CRITICAL" if attestation_grade == "F" else "HIGH"
+    else:
+        overall_risk = technical_score.risk_tier
+    
+    return DualScoreResponse(
+        deterministic_technical_score=technical_score.score,
+        self_attested_score=attestation_score,
+        self_attested_grade=attestation_grade,  # type: ignore
+        risk_tier=overall_risk,  # type: ignore
+        attestation_verdict=attestation_verdict,  # type: ignore
+        score_delta=score_delta,
+        flags=flags,
+        gaps=gaps,
+    )
