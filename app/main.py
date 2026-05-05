@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy import select, text
@@ -47,13 +48,19 @@ async def score_assessment(
             .limit(1)
         )
         last_log = result.scalar_one_or_none()
-        prev_hash = (
-            hashlib.sha256(
-                f"{last_log.id}{last_log.timestamp}{last_log.action}".encode()
+        if last_log:
+            payload_digest = hashlib.sha256(
+                json.dumps(
+                    last_log.payload,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
             ).hexdigest()
-            if last_log
-            else None
-        )
+            prev_hash = hashlib.sha256(
+                f"{last_log.id}{last_log.timestamp}{last_log.action}{payload_digest}".encode()
+            ).hexdigest()
+        else:
+            prev_hash = None
 
         db.add(
             AuditLog(
