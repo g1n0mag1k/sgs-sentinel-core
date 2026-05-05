@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +21,21 @@ app = FastAPI(title="SGS-Sentinel Core", version="0.1.0")
 app.include_router(auth_router.router)
 app.include_router(tenants_router.router)
 app.include_router(facilities_router.router)
+
+# Define the origins that are allowed to make requests to this API
+origins = [
+    "https://sui-g3n3ri.me",         # Your live production site
+    "http://localhost:3000",        # Common for local dev
+    "http://127.0.0.1:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,           # Restricts access to your specific domains
+    allow_credentials=True,          # Allows the browser to send cookies/auth headers
+    allow_methods=["*"],             # Allows POST, GET, OPTIONS, etc.
+    allow_headers=["*"],             # Allows Authorization and Content-Type headers
+)
 
 
 @app.get("/api/health")
