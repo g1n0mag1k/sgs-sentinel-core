@@ -4,7 +4,7 @@ import hashlib
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
@@ -39,9 +39,8 @@ app.add_middleware(
 
 
 @app.get("/api/health")
-async def health_check(db: AsyncSession = Depends(get_db)) -> dict[str, str]:
-    """Verify database connectivity."""
-    await db.execute(text("SELECT 1"))
+async def health_check() -> dict[str, str]:
+    """Liveness probe endpoint."""
     return {"status": "ok"}
 
 
