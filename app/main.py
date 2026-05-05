@@ -12,6 +12,7 @@ from app.models import AuditLog, User
 from app.routers import auth as auth_router
 from app.routers import facilities as facilities_router
 from app.routers import tenants as tenants_router
+from app.routers import users as users_router
 from app.schemas import ScoreRequest, ScoreResponse
 from app.services.scoring import evaluate_dscsa_risk
 
@@ -20,6 +21,7 @@ app = FastAPI(title="SGS-Sentinel Core", version="0.1.0")
 app.include_router(auth_router.router)
 app.include_router(tenants_router.router)
 app.include_router(facilities_router.router)
+app.include_router(users_router.router)
 
 
 @app.get("/api/health")
@@ -37,7 +39,7 @@ async def score_assessment(
 ) -> ScoreResponse:
     """Score an EPCIS payload and write an immutable chained audit record."""
     try:
-        score = await evaluate_dscsa_risk(request.model_dump())
+        score = await evaluate_dscsa_risk(request.payload)
 
         # Compute prev_hash from most recent audit log for this tenant
         result = await db.execute(
