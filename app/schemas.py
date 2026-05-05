@@ -63,3 +63,17 @@ class FacilityResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class TenantCreate(BaseModel):
+    """Request model for creating a new tenant."""
+    name: str = Field(..., min_length=1)
+
+
+class TenantResponse(BaseModel):
+    """Response model for tenant details."""
+    id: UUID
+    name: str
+    is_active: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
