@@ -1,5 +1,7 @@
 from typing import Literal, Any
-from pydantic import BaseModel, Field
+from datetime import datetime
+from uuid import UUID
+from pydantic import BaseModel, Field, ConfigDict
 
 AttestationAnswer = Literal["yes", "partial", "no"]
 
@@ -44,3 +46,20 @@ class DualScoreResponse(BaseModel):
     score_delta: int   # technical - attested*100 (divergence signal)
     flags: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
+
+
+class FacilityCreate(BaseModel):
+    """Request model for creating a new facility."""
+    name: str = Field(..., min_length=1)
+    gln: str = Field(..., min_length=10)
+
+
+class FacilityResponse(BaseModel):
+    """Response model for facility details."""
+    id: UUID
+    tenant_id: UUID
+    name: str
+    gln: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
