@@ -32,14 +32,25 @@ def normalize_database_url(raw_url: str) -> str:
 
 
 # Use environment DATABASE_URL or fall back to SQLite for local development
-raw_database_url = settings.DATABASE_URL or os.getenv("DATABASE_URL")
-database_url = normalize_database_url(raw_database_url) if raw_database_url else "sqlite+aiosqlite:///./test.db"
-try:
-    engine = create_async_engine(database_url, echo=False, pool_pre_ping=True)
-except Exception as exc:
-    # Fallback to SQLite when DATABASE_URL is missing or invalid.
-    print(f"Database connection warning: {exc}. Using SQLite fallback.")
-    engine = create_async_engine("sqlite+aiosqlite:///./test.db", echo=False, pool_pre_ping=True)
+FALLBACK_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+
+
+def create_engine_from_env():
+    raw_url = settings.DATABASE_URL or os.getenv("DATABASE_URL")
+    if not raw_url:
+        return create_async_engine(FALLBACK_DATABASE_URL, echo=False, pool_pre_ping=True)
+    try:
+        database_url = normalize_database_url(raw_url)
+        return create_async_engine(database_url, echo=False, pool_pre_ping=True)
+    except Exception as e:
+        strict_mode = os.getenv("STRICT_DATABASE_URL", "").lower() in {"1", "true", "yes"}
+        if strict_mode:
+            raise
+        print(f"Database connection warning: {e}. Using SQLite fallback.")
+        return create_async_engine(FALLBACK_DATABASE_URL, echo=False, pool_pre_ping=True)
+
+
+engine = create_engine_from_env()
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
