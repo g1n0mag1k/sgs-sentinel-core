@@ -46,6 +46,7 @@ class DualScoreResponse(BaseModel):
     score_delta: int   # technical - attested*100 (divergence signal)
     flags: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
+    audit_log_id: str | None = None
 
 
 class FacilityCreate(BaseModel):

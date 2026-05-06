@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import your database connection and routers
 from app.database import engine, get_db
-from app.routers import auth, facilities, tenants
+from app.routers import auth, facilities, tenants, assessments
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,6 +42,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(facilities.router, prefix="/facilities", tags=["Facilities"])
 app.include_router(tenants.router, prefix="/tenants", tags=["Tenants"])
+app.include_router(assessments.router)
 
 @app.get("/")
 async def root():
