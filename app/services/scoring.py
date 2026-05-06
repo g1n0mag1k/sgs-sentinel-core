@@ -17,14 +17,45 @@ def _extract_gln(payload: dict[str, Any]) -> str:
     # Try common EPCIS payload locations for GLN
     if "bizLocation" in payload:
         biz_loc = payload["bizLocation"]
-        if isinstance(biz_loc, dict) and "id" in biz_loc:
-            gln = biz_loc["id"]
-            # Extract numeric GLN from URN (e.g., "urn:epc:id:sgln:0614141.00000.0")
-            if "sgln:" in gln:
-                parts = gln.split("sgln:")[-1].split(".")
-                if len(parts) >= 2:
-                    return parts[0] + parts[1]
-            return gln
+        if isinstance(biz_loc, dict):
+            if "gln" in biz_loc:
+                return str(biz_loc["gln"])
+            if "id" in biz_loc:
+                gln = biz_loc["id"]
+                # Extract numeric GLN from URN (e.g., "urn:epc:id:sgln:0614141.00000.0")
+                if "sgln:" in gln:
+                    parts = gln.split("sgln:")[-1].split(".")
+                    if len(parts) >= 2:
+                        return parts[0] + parts[1]
+                return gln
+
+    if "metadata" in payload:
+        meta = payload.get("metadata", {})
+        if isinstance(meta, dict):
+            root = meta.get("root", {})
+            if isinstance(root, dict) and "gln" in root:
+                return str(root["gln"])
+
+    if "events" in payload:
+        events = payload.get("events", [])
+        if isinstance(events, list):
+            for event in events:
+                if not isinstance(event, dict):
+                    continue
+                biz_loc = event.get("bizLocation")
+                if isinstance(biz_loc, dict):
+                    if "gln" in biz_loc:
+                        return str(biz_loc["gln"])
+                    if "id" in biz_loc:
+                        return str(biz_loc["id"])
+                read_point = event.get("readPoint")
+                if isinstance(read_point, dict) and "id" in read_point:
+                    gln = str(read_point["id"])
+                    if "sgln:" in gln:
+                        parts = gln.split("sgln:")[-1].split(".")
+                        if len(parts) >= 2:
+                            return parts[0] + parts[1]
+                    return gln
     
     if "sensorElementList" in payload:
         sensors = payload.get("sensorElementList", [])
