@@ -1,26 +1,25 @@
-import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import your database connection and routers
-from app.database import engine, get_db, database
+from app.database import engine, get_db
 from app.routers import auth, facilities, tenants
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- Startup: Connect to the Intelligence Base / DB ---
     try:
-        await database.connect()
-        print("SGS-Sentinel: Database connection established.")
+        async with engine.connect():
+            print("SGS-Sentinel: Database connection established.")
     except Exception as e:
         print(f"SGS-Sentinel: Database connection failed: {e}")
     
     yield
     
     # --- Shutdown: Clean Disconnect ---
-    await database.disconnect()
+    await engine.dispose()
     print("SGS-Sentinel: Database connection closed.")
 
 app = FastAPI(

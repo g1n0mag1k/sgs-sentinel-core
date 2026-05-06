@@ -20,14 +20,21 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+
+def normalize_database_url(raw_url: str) -> str:
+    if raw_url.startswith("postgres://"):
+        return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if raw_url.startswith("postgresql://") and "+asyncpg" not in raw_url:
+        return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    if raw_url.startswith("sqlite://") and "+aiosqlite" not in raw_url:
+        return raw_url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+    return raw_url
+
+
 # Use environment DATABASE_URL or fall back to SQLite for local development
-try:
-    database_url = settings.DATABASE_URL or os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
-    engine = create_async_engine(database_url, echo=False, pool_pre_ping=True)
-except Exception as e:
-    # Fallback: always use SQLite if connection fails
-    print(f"Database connection warning: {e}. Using SQLite fallback.")
-    engine = create_async_engine("sqlite+aiosqlite:///./test.db", echo=False, pool_pre_ping=True)
+raw_database_url = settings.DATABASE_URL or os.getenv("DATABASE_URL")
+database_url = normalize_database_url(raw_database_url) if raw_database_url else "sqlite+aiosqlite:///./test.db"
+engine = create_async_engine(database_url, echo=False, pool_pre_ping=True)
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,

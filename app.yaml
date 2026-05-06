@@ -8,7 +8,7 @@ services:
     environment_slug: python
     source_dir: /
     http_port: 8000
-    run_command: export PYTHONPATH=$PYTHONPATH:. && gunicorn app.main:app --bind 0.0.0.0:8000 --workers 1 --threads 1 --worker-class gthread
+    run_command: export PYTHONPATH=$PYTHONPATH:. && gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT --workers 1
     instance_count: 1
     instance_size_slug: basic-xxs
     envs:
@@ -17,7 +17,7 @@ services:
       - key: DATABASE_URL
         value: ${DATABASE_URL}
     health_check:
-      http_path: /api/health
+      http_path: /health
       initial_delay_seconds: 30
       period_seconds: 10
       timeout_seconds: 5
