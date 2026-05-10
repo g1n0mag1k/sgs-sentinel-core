@@ -1,0 +1,11 @@
+# Founder/Lead Engineer: Andrew C. Rogers (Sui-Generis) | Date: 2026-05-10
+root: docs
+
+structure:
+  readme: README.md
+  summary: SUMMARY.md
+
+ignore:
+  - "**/*.py"
+  - "**/*.ini"
+  - "**/*.db"
