@@ -19,23 +19,34 @@ def _read_first_existing(paths: list[str]) -> str | None:
     return None
 
 
+def _host_fingerprint_seed() -> str:
+    source = _read_first_existing(["/etc/machine-id", "/var/lib/dbus/machine-id"])
+    if source:
+        return source
+    return platform.node().strip() or f"mac:{uuid.getnode():012x}"
+
+
 @lru_cache(maxsize=1)
 def get_device_id() -> str:
-    """Return a stable device identifier for hardware-bound audit hashing.
+    """Return the device identifier used for hardware-bound audit hashing.
 
-    Resolution order:
-    1. SGS_DEVICE_ID env var (explicit override)
-    2. Linux machine-id files
-    3. Hostname
-    4. MAC address from uuid.getnode()
+    Default behavior is environment-driven to keep repositories portable:
+    1. SGS_DEVICE_ID (required in production)
+    2. Optional host fingerprint fallback when SGS_ALLOW_HOST_FINGERPRINT=true
     """
     explicit_id = os.getenv("SGS_DEVICE_ID", "").strip()
     if explicit_id:
         return explicit_id
 
-    source = _read_first_existing(["/etc/machine-id", "/var/lib/dbus/machine-id"])
-    if not source:
-        source = platform.node().strip() or f"mac:{uuid.getnode():012x}"
+    allow_host_fingerprint = os.getenv("SGS_ALLOW_HOST_FINGERPRINT", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    if allow_host_fingerprint:
+        return hashlib.sha256(_host_fingerprint_seed().encode("utf-8")).hexdigest()
 
-    # Avoid storing raw machine identifiers while keeping deterministic binding.
-    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+    raise RuntimeError(
+        "SGS_DEVICE_ID is not set. Set SGS_DEVICE_ID explicitly "
+        "or enable SGS_ALLOW_HOST_FINGERPRINT=true for local lab-only fallback."
+    )

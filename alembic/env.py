@@ -18,12 +18,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Lead Engineer Note: We pull the DATABASE_URL directly from the environment
-# to maintain ALCOA+ compliance and environment isolation.
-database_url = os.getenv(
-    "DATABASE_URL", 
-    "postgresql+asyncpg://postgres:NewStrongPassword123!@localhost:5432/sgs_sentinel"
-)
+# Pull DATABASE_URL from environment; use a non-secret local fallback for portability.
+database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
 config.set_main_option("sqlalchemy.url", database_url)
 
 # Set target metadata for 'autogenerate' support

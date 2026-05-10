@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# SGS-Sentinel generated artifacts
+quarantine/*.json
+.tamper_backup.json
+sgs_sentinel.db
+test.db
