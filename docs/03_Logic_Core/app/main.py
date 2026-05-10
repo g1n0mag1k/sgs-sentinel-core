@@ -30,9 +30,15 @@ app = FastAPI(
 )
 
 # CORS Middleware for mobile-first environment (Termux/Web access)
+# ALCOA+ Validated Origins for sentinel1.tech domain authority
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://sentinel1.tech",
+        "https://docs.sentinel1.tech",
+        "https://sui-g3n3ri.me",
+        "http://localhost:8080",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,5 +1,6 @@
 name: sgs-sentinel-app
 region: nyc
+api_domain: sentinel1.tech
 features:
   - buildpack-stack=ubuntu-22
 
