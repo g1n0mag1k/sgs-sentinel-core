@@ -29,6 +29,10 @@ class DualScoreRequest(BaseModel):
     epcis_payload: dict[str, Any]
     attestation: M1M6Attestation
     facility_name: str
+    profile: str | None = "manufacturer"  # Profile type; defaults to "manufacturer"
+    attestor_name: str | None = None
+    attestor_title: str | None = None
+    paid: bool = False
 
 
 class SessionRequest(BaseModel):

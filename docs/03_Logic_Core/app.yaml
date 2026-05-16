@@ -17,6 +17,10 @@ services:
         value: ${SECRET_KEY}
       - key: DATABASE_URL
         value: ${DATABASE_URL}
+      - key: API_BASE_URL
+        value: https://sentinel1.tech
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://sentinel1.tech,https://docs.sui-g3n3ri.me,https://sui-g3n3ri.me,http://localhost:8080
     health_check:
       http_path: /health
       initial_delay_seconds: 30

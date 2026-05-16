@@ -251,3 +251,90 @@ def calculate_dual_score(
         flags=flags,
         gaps=gaps,
     )
+
+
+def compute_score(
+    answers: dict[str, AttestationAnswer],
+    profile: str | None = None,
+) -> dict[str, Any]:
+    """Compute deterministic server-side score from attestation answers and profile.
+    
+    This is the AUTHORITATIVE SOURCE OF TRUTH for score calculation.
+    No client-submitted score data is trusted. Only answers and profile matter.
+    
+    Args:
+        answers: Attestation answers dict (e.g., {"M1-Q1": "yes", "M2-Q3": "no", ...})
+        profile: Profile type ('manufacturer', 'distributor', etc). Defaults to 'manufacturer'.
+    
+    Returns:
+        Dictionary with keys:
+            - overall_pct: 0-100 integer percentage of "yes" answers
+            - grade: Letter grade A-F based on percentage
+            - verdict: Compliance verdict (COMPLIANT, NON_COMPLIANT, CRITICAL_FAILURE)
+            - risk_tier: Risk tier (LOW, MEDIUM, HIGH, CRITICAL)
+            - gaps: List of question IDs where answer was not "yes"
+    """
+    # Default profile if not provided
+    if profile is None:
+        profile = "manufacturer"
+    
+    # Handle empty answers
+    if not answers:
+        return {
+            "overall_pct": 0,
+            "grade": "F",
+            "verdict": "CRITICAL_FAILURE",
+            "risk_tier": "CRITICAL",
+            "gaps": [],
+        }
+    
+    gaps: list[str] = []
+    yes_count = 0
+    
+    # Count "yes" answers and collect gaps
+    for question_id, answer in answers.items():
+        if answer == "yes":
+            yes_count += 1
+        else:
+            gaps.append(question_id)
+    
+    # Calculate percentage score
+    overall_pct = int((yes_count / len(answers)) * 100)
+    
+    # Determine grade (A-F) based on percentage
+    if overall_pct >= 90:
+        grade = "A"
+    elif overall_pct >= 80:
+        grade = "B"
+    elif overall_pct >= 70:
+        grade = "C"
+    elif overall_pct >= 60:
+        grade = "D"
+    else:
+        grade = "F"
+    
+    # Determine verdict based on grade
+    if grade == "F":
+        verdict = "CRITICAL_FAILURE"
+    elif grade in ["D", "C"]:
+        verdict = "NON_COMPLIANT"
+    else:
+        verdict = "COMPLIANT"
+    
+    # Determine risk tier (inverse of grade quality)
+    if grade == "F":
+        risk_tier = "CRITICAL"
+    elif grade in ["D", "C"]:
+        risk_tier = "HIGH"
+    elif grade == "B":
+        risk_tier = "MEDIUM"
+    else:
+        risk_tier = "LOW"
+    
+    return {
+        "overall_pct": overall_pct,
+        "grade": grade,
+        "verdict": verdict,
+        "risk_tier": risk_tier,
+        "gaps": gaps,
+    }

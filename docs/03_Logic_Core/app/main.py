@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Import your database connection and routers
 from app.database import engine, get_db
 from app.routers import auth, facilities, tenants, assessments
+from app.routers.billing import router as billing_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,7 +36,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://sentinel1.tech",
-        "https://docs.sentinel1.tech",
+        "https://docs.sui-g3n3ri.me",
         "https://sui-g3n3ri.me",
         "http://localhost:8080",
     ],
@@ -49,6 +50,7 @@ app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(facilities.router, prefix="/facilities", tags=["Facilities"])
 app.include_router(tenants.router, prefix="/tenants", tags=["Tenants"])
 app.include_router(assessments.router)
+app.include_router(billing_router)
 
 @app.get("/")
 async def root():
